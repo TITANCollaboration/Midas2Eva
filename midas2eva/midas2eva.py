@@ -1,4 +1,4 @@
-import sys
+#import sys
 import os
 import commands
 from struct import pack
@@ -16,30 +16,30 @@ import ast
 
 class MidasToEva:
 
-    def __init__(self,filename):
+    def __init__(self, filename):
         if os.path.isfile(filename) and filename.endswith('.mid'):
-            self.status=1
-            self.filename=filename
+            self.status = 1
+            self.filename = filename
         else:
-            print(filename+" is not a valid MIDAS file.")
-            self.status=0
+            print(filename + " is not a valid MIDAS file.")
+            self.status = 0
 
     def extractXML(self):
         if self.status:
             try:
-                datafile=open(self.filename,'r')
-                data=datafile.read()
+                datafile = open(self.filename, 'r')
+                data = datafile.read()
                 datafile.close()
                 #startindex=data.find('<?xml')
-                startindex=data.find('<odb')
-                endindex=data.find('</odb>') + 6
+                startindex = data.find('<odb')
+                endindex = data.find('</odb>') + 6
                 #self.xmldata=data[startindex:endindex]
                 #self.dom=parseString(self.xmldata)
                 self.domag = ET.fromstring(data[startindex:endindex])
 
                 #secstartindex=data.find('<?xml',endindex)
-                secstartindex=data.rfind('<odb')
-                secendindex=data.rfind('</odb>') + 6
+                secstartindex = data.rfind('<odb')
+                secendindex = data.rfind('</odb>') + 6
                 #print secstartindex
                 #print len(data)
                 #self.xmldata2=data[secstartindex:-1]
@@ -47,8 +47,8 @@ class MidasToEva:
                 #self.dom2ag = ET.fromstring(data[secstartindex:-1])
                 self.dom2ag = ET.fromstring(data[secstartindex:secendindex])
             except IOError:
-                print("Could not open "+self.filename)
-                self.status=0
+                print("Could not open " + self.filename)
+                self.status = 0
 
     def getAttribute(self, xml, dirpath, dirname, keyname, castfunc=str):
         '''
@@ -71,64 +71,72 @@ class MidasToEva:
                             dirpath + " " + dirname + " " + keyname)
 
     def getBaseFreq(self):
-        if self.status==1 and len(self.xmldata)>0:
-            elementlist=self.dom.getElementsByTagName('key')
-            self.basefreq=-1
+        if self.status == 1 and len(self.xmldata) > 0:
+            elementlist = self.dom.getElementsByTagName('key')
+            self.basefreq = -1
 
             for element in elementlist:
-                if element.getAttribute('name')=='Base Frequency':
-                    self.basefreq=float(element.firstChild.data)
+                if element.getAttribute('name') == 'Base Frequency':
+                    self.basefreq = float(element.firstChild.data)
 
-            if self.basefreq==-1:
+            if self.basefreq == -1:
                 print 'Could not determine base frequency.'
 
-    def getAmplitude(self,rfamp=None):
+    def getAmplitude(self, rfamp=None):
         if rfamp is not None:
             self.amplitude = float(rfamp)
         else:
-            self.amplitude = self.getAttribute(self.domag, './dir/dir', 'Variables',
-                                            'MPETRFAmp', float)
+            self.amplitude = self.getAttribute(self.domag, './dir/dir',
+                                               'Variables', 'MPETRFAmp', float)
 
-        if self.amplitude==-1:
+        if self.amplitude == -1:
             print 'Could not determine amplitude.'
         else:
             print 'RF amplitude = ' + str(self.amplitude) + ' Volts'
 
-    def getStartFreq(self,startf=None):
+    def getStartFreq(self, startf=None):
         # AG: 16.04.12
         # Need to use the second odb dump in the mid file
         if startf is not None:
             # hack. Commandline input is in Hz, odb is in MHz
             self.startfreq = float(startf) / 1e6
         else:
-            self.startfreq = self.getAttribute(self.dom2ag, './dir/dir', 'Variables',
-                                            'StartFreq (MHz)', float)
+            self.startfreq = self.getAttribute(self.dom2ag, './dir/dir',
+                                               'Variables', 'StartFreq (MHz)',
+                                               float)
 
         self.startfreq *= 1e6
         print 'Start frequency = ' + str(self.startfreq) + ' Hertz'
 
-    def getStopFreq(self,stopf=None):
+    def getStopFreq(self, stopf=None):
         if stopf is not None:
             # hack. Commandline input is in Hz, odb is in MHz
             self.stopfreq = float(stopf) / 1e6
         else:
-            self.stopfreq = self.getAttribute(self.dom2ag, './dir/dir', 'Variables',
-                                            'EndFreq (MHz)', float)
+            self.stopfreq = self.getAttribute(self.dom2ag, './dir/dir',
+                                              'Variables', 'EndFreq (MHz)',
+                                              float)
 
         self.stopfreq *= 1e6
-        if self.stopfreq==-1:
+        if self.stopfreq == -1:
+            # ATG 22-10-2015:
+            # The code should never get here.
+            # Is this from when I rewrote Ryan's code?
             print 'Could not determine stop frequency.'
         else:
             print 'Stop frequency = ' + str(self.stopfreq) + ' Hertz'
 
-    def getNumFreqSteps(self,nfreq=None):
+    def getNumFreqSteps(self, nfreq=None):
         if nfreq is not None:
             self.numfreqsteps = float(nfreq)
         else:
-            self.numfreqsteps = self.getAttribute(self.dom2ag, './dir/dir/dir/dir', 'begin_ramp',
-                                                'loop count', float)
+            self.numfreqsteps = self.getAttribute(self.dom2ag,
+                                                  './dir/dir/dir/dir',
+                                                  'begin_ramp',
+                                                  'loop count',
+                                                  float)
 
-        if self.numfreqsteps==-1:
+        if self.numfreqsteps == -1:
             print 'Could not determine the number of frequency steps'
         else:
             print 'Number of frequency steps = ' + str(self.numfreqsteps)
@@ -136,57 +144,57 @@ class MidasToEva:
         print self.numfreqsteps
 
     def getNumCycles(self):
-        self.numcycles = self.getAttribute(self.domag, './dir/dir/dir/dir', 'begin_scan',
-                                           'loop count', float)
-        if self.numcycles==-1:
+        self.numcycles = self.getAttribute(self.domag, './dir/dir/dir/dir',
+                                           'begin_scan', 'loop count', float)
+        if self.numcycles == -1:
             print 'Could not determine the number of cycles'
 
     def getCycleTime(self):
         pass
 
-    def getStartTime(self,startt=None):
+    def getStartTime(self, startt=None):
         self.starttime = self.getAttribute(self.domag, './dir', 'Runinfo',
                                            'Start time binary', float)
-        if self.starttime==-1:
+        if self.starttime == -1:
             print 'Could not determine the start time'
         else:
-            print 'Start time = '+ str(self.starttime)
+            print 'Start time = ' + str(self.starttime)
 
     def getEndTime(self, stopt=None):
         self.endtime = self.getAttribute(self.dom2ag, './dir', 'Runinfo',
                                          'Stop time binary', float)
-        if self.endtime==-1:
+        if self.endtime == -1:
             print 'Could not determine the end time'
         else:
             print 'End time =' + str(self.endtime)
 
-    def getElem(self,mass=None):
+    def getElem(self, mass=None):
         if mass is not None:
             self.mass = str(mass)
         else:
             self.mass = self.getAttribute(self.domag, './dir/dir', 'Variables',
-                                        'Species', str)
+                                          'Species', str)
 
-        if self.mass==-1:
+        if self.mass == -1:
             print 'Could not determine element'
         else:
             print 'Element = ' + self.mass
 
-    def getZ(self,Z=None):
+    def getZ(self, Z=None):
         if Z is not None:
             self.charge = int(Z)
         else:
-            self.charge = self.getAttribute(self.domag, './dir/dir', 'Variables',
-                                            'Charge')
-            self.charge = [ int(x) for x in self.charge.split(';')]
+            self.charge = self.getAttribute(self.domag, './dir/dir',
+                                            'Variables', 'Charge')
+            self.charge = [int(x) for x in self.charge.split(';')]
             self.charge = self.charge[0]
 
-        if self.charge==-1:
+        if self.charge == -1:
             print 'Could not determine charge'
         else:
             print 'Charge = ' + str(self.charge)
 
-    def getRFTime(self,trf=None):
+    def getRFTime(self, trf=None):
         '''if no trf value is passed, search the midas file for it.
            If a trf value is passed, use that value.
 
@@ -205,18 +213,23 @@ class MidasToEva:
                 try:
                     self.trf += self.getAttribute(self.domag,
                                                   "./dir/dir/dir/dir",
-                                                  "transition_QUAD" + str(transNum),
+                                                  "transition_QUAD" +
+                                                  str(transNum),
                                                   "time offset (ms)",
                                                   float)
                 except:
-                    # No more 'transition_QUAD's were found, so return the rftime
+                    # No more 'transition_QUAD's were found,
+                    # so return the rftime
                     break
                 transNum += 2
 
         # Convert from ms to sec
         self.trf /= 1000.
 
-        if self.trf==-1:
+        if self.trf == -1:
+            # ATG 22-10-2015:
+            # The code should never get here.
+            # Is this from when I rewrote Ryan's code?
             print 'Could not determine the RF time'
         else:
             print 'RF Time = ' + str(self.trf) + ' s'
@@ -226,11 +239,14 @@ class MidasToEva:
             self.tdcTime = float(tdcTime)
         else:
             self.tdcTime = self.getAttribute(self.domag, "./dir/dir/dir/dir",
-                                        "pul_TDCGate", "pulse width (ms)",
-                                        float)
+                                             "pul_TDCGate", "pulse width (ms)",
+                                             float)
             self.tdcTime *= 1000.0
 
         if self.tdcTime == -1:
+            # ATG 22-10-2015:
+            # The code should never get here.
+            # Is this from when I rewrote Ryan's code?
             print 'Could not determine amplitude'
         else:
             print 'TDC Gate Width = ' + str(self.tdcTime) + ' us'
@@ -247,7 +263,7 @@ class MidasToEva:
         status, data = commands.getstatusoutput(comstring)
 
         startindex = 0
-        datalength = len(data)
+        #datalength = len(data)
         mdumpdata = []
         self.posdata = []
 
@@ -260,13 +276,13 @@ class MidasToEva:
                 temp = tempstring.split('(')
                 numentries = int(temp[0]) / 4
 
-                counter=1
+                counter = 1
                 #while counter<=numentries:
                 for counter in xrange(numentries):
-                    midindex=data.find('0x',leftindex)
-                    mdumpdata.append(data[midindex:midindex+10])
+                    midindex = data.find('0x', leftindex)
+                    mdumpdata.append(data[midindex:midindex + 10])
                     #counter+=1
-                    leftindex=midindex+1
+                    leftindex = midindex + 1
 
                 #startindex=leftindex
         else:
@@ -337,7 +353,7 @@ class MidasToEva:
         self.mdumparray = mdumparray
         self.errarray = errarray
 
-    def binMdumpData(self,binwidth=0.1,maxtof=100):
+    def binMdumpData(self, binwidth=0.1, maxtof=100):
         '''
         binMdumpData bins the data collected from mdump.
 
@@ -371,19 +387,21 @@ class MidasToEva:
                     #tofbin[bin]=tofbin[bin]+1
                     tofbin.append(bin)
 
-    def writeEvaFile(self, mass, charge, amp, extime, path='/triumfcs/trshare/titan/MPET/Data/'):
+    def writeEvaFile(self, mass, charge, amp, extime,
+                     path='/triumfcs/trshare/titan/MPET/Data/'):
         '''
         writeEVAFile writes the collected and binned mdump data to an EVA file.
 
-        In order to determine the frequencies that were used the function 'genFreqList' is called.
+        In order to determine the frequencies that were used the function
+        'genFreqList' is called.
         '''
 
         evafilename = self.filename[:-4] + '_eva.dat'
         path = path + basename(evafilename)
         try:
-            datafile = open(path,'w')
+            datafile = open(path, 'w')
         except IOError:
-            print 'Could not open '+path+' for writing.'
+            print 'Could not open ' + path + ' for writing.'
             return
 
         # this will be the header length
@@ -392,9 +410,11 @@ class MidasToEva:
         datafile.write(pack('i', 2))
 
         # Write the header info
-        datafile.write('\n\n[Mass]\n Mass=' + self.mass + ' ,Charge= ' + str(self.charge) + '\n\n')
+        datafile.write('\n\n[Mass]\n Mass=' + self.mass +
+                       ' ,Charge= ' + str(self.charge) + '\n\n')
         datafile.write('[Switch]\n NrCycles=-1\n\n')
-        datafile.write('[Excit]\n Mass=' + self.mass + ' ,Charge= ' + str(self.charge) + ',Freq =')
+        datafile.write('[Excit]\n Mass=' + self.mass +
+                       ' ,Charge= ' + str(self.charge) + ',Freq =')
         datafile.write(str((self.stopfreq - self.startfreq) / 2) + ', Amp= ')
         datafile.write(str(self.amplitude) + ',Time=' + str(self.trf) + '\n\n')
         datafile.write('[MCA]\n MCA=sim,TimePerChannel=' + str(self.binwidth))
@@ -403,10 +423,13 @@ class MidasToEva:
         datafile.write('[SCAN0]\n Dev=AFG, Fct=SetFrequency, Spec=,\n')
         datafile.write(' Start=' + str(self.startfreq))
         datafile.write(', Stop=' + str(self.stopfreq))
-        datafile.write(', Step=' + str((self.stopfreq - self.startfreq) / self.numfreqsteps))
+        datafile.write(', Step=' + str((self.stopfreq - self.startfreq)
+                                       / self.numfreqsteps))
         datafile.write(', Unit=Hz\n\n[SCAN1]\n Dev=*, Fct=*, Spec=,\n')
-        datafile.write(' Start=0.000000, Stop=0.000000, Step=1.000000, Unit=1\n\n')
-        datafile.write('*---------------here the binary part begins---------------*\n')
+        datafile.write(' Start=0.000000, Stop=0.000000,' +
+                       'Step=1.000000, Unit=1\n\n')
+        datafile.write('*---------------here the binary' +
+                       'part begins---------------*\n')
         headerlen = int(datafile.tell()) - 8
         datafile.seek(0)
         datafile.write(pack('i', headerlen))
@@ -421,7 +444,7 @@ class MidasToEva:
         datafile.write(pack('d', 0))
 
         # get and write the position of the binary data start
-        datastart=int(datafile.tell())
+        datastart = int(datafile.tell())
         datafile.seek(4)
         datafile.write(pack('i', datastart))
         datafile.seek(datastart)
@@ -454,7 +477,7 @@ class MidasToEva:
         datafile.write(datastring)
         datafile.close()
 
-    def writePosData(self,path='/titan/data5/mpet/tmp/'):
+    def writePosData(self, path='/titan/data5/mpet/tmp/'):
         if len(self.posdata) == 0:
             return
 
@@ -476,12 +499,13 @@ class MidasToEva:
         for num in self.posdata:
             x = int(num[6:8], 16)
             y = int(num[8:10], 16)
-            #datafile.write(str(len(self.posdata))+' '+str(len(TTOF))+' '+str(x)+' '+str(y)+'\n')
+            #datafile.write(str(len(self.posdata))+' '+str(len(TTOF))+
+            #               ' '+str(x)+' '+str(y)+'\n')
             datafile.write(str(x) + ' ' + str(y) + '\n')
 
         datafile.close()
 
-    def writeMdumpData(self,path='/triumfcs/trshare/titan/MPET/Data/'):
+    def writeMdumpData(self, path='/triumfcs/trshare/titan/MPET/Data/'):
         dumpfilename = self.filename[:-4] + '_dump.dat'
         path = path + basename(dumpfilename)
 
@@ -495,7 +519,7 @@ class MidasToEva:
 
         datafile.close()
 
-    def writeErrorData(self,path='/triumfcs/trshare/titan/MPET/Data/'):
+    def writeErrorData(self, path='/triumfcs/trshare/titan/MPET/Data/'):
         if len(self.errarray) == 0:
             return
 
@@ -517,18 +541,18 @@ class MidasToEva:
         '''
         genFreqList generates the frequency list to be written to the EVA file.
 
-        First we try to read the 'Quad FreqList' variable in the midas file ODB dump.
-        If it exists then we generate the list.
+        First we try to read the 'Quad FreqList' variable in the midas file ODB
+        dump.  If it exists then we generate the list.
 
-        If it doesn't exist, then we use the start and stop frequencies and the number of
-        steps to generate the frequency list.
+        If it doesn't exist, then we use the start and stop frequencies and the
+        number of steps to generate the frequency list.
 
         ATG: Tested 16.10.13 with file 187070.mid and 187036.mid
         '''
         FreqList = []
         try:
             fl = self.getAttribute(self.dom2ag, './dir/dir', 'Variables',
-                                            'Quad FreqList')
+                                   'Quad FreqList')
             print fl
             fl = fl.split(';')
             print fl
@@ -539,7 +563,8 @@ class MidasToEva:
                 for i in range(int(x[2])):
                     FreqList.append(float(x[0]) - float(x[1]) + i * df)
         except:
-            dfreq = (float(self.stopfreq) - float(self.startfreq)) / (float(self.numfreqsteps) - 1.)
+            dfreq = ((float(self.stopfreq) - float(self.startfreq))
+                     / (float(self.numfreqsteps) - 1.))
             for i in range(int(self.numfreqsteps)):
                 FreqList.append(float(self.startfreq) + i * dfreq)
 
