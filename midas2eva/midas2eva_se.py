@@ -40,3 +40,6 @@ class SDA(MidasToEva):
                     datafile2.write(str(i) + ' ' + str(j) +
                                     ' ' + str(hist[j]) + '\n')
         datafile2.close()
+
+    def getbindata(self):
+        return self.bindata
