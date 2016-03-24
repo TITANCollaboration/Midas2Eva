@@ -14,6 +14,33 @@ import ast
 # use titan01 to convert the data files.
 
 
+class MissingEvent(Exception):
+    def __init__(self, cycleNumber):
+        self.cycleNumber = cycleNumber
+
+    def __str__(self):
+        return ("Possible missing event near cycle number "
+                + str(self.cycleNumber))
+
+
+class MissingTDCOpen(Exception):
+    def __init__(self, cycleNumber):
+        self.cycleNumber = cycleNumber
+
+    def __str__(self):
+        return ("Missing TDCOpen event at cycle number "
+                + str(self.cycleNumber))
+
+
+class MissingTDCClose(Exception):
+    def __init__(self, cycleNumber):
+        self.cycleNumber = cycleNumber
+
+    def __str__(self):
+        return ("Missing TDCClose event at cycle number "
+                + str(self.cycleNumber))
+
+
 class MidasToEva:
 
     def __init__(self, filename):
@@ -360,6 +387,14 @@ class MidasToEva:
         The binned data is saved as in array for each cycle.
         This array is then appended to a 'master' tof array
         that contains the tof info for each type of event.
+
+        We also check to ensure that the event cycle counter
+        is updated correctly through the MIDAS file. This
+        checks if a TDCOpen or TDCClose event is missing,
+        and also checks if there are any missing events.
+        If a missing gate or event is detected, an
+        exception will be thrown, and any further file
+        conversion will be aborted.
         '''
         # binwidth and maxtof are in units of us
 
@@ -372,9 +407,30 @@ class MidasToEva:
 
         for entry in self.mdumparray:
             if entry[0] == 8:
+                startTdcGateCounter = entry[1]
                 continue
             elif entry[0] == 1:
+                endTdcGateCounter = entry[1]
+                # Check that the start and end GateCounters
+                # are correct
+                if startTdcGateCounter != endTdcGateCounter:
+                    print "ERROR: Gate counters out of sync."
+                    if startTdcGateCounter < endTdcGateCounter:
+                        print "ERROR: missing TDCGateOpen event"
+                        raise MissingTDCOpen(cyclecounter)
+                    else:
+                        print "ERROR: missing TDCGateClose event"
+                        raise MissingTDCClose(cyclecounter)
+
+                #print endTdcGateCounter, (startTdcGateCounter % 1024)
+                # Increment cycle counter
                 cyclecounter = cyclecounter + 1
+                # Cycle counter resets at 1024, so we check that the
+                # mod of the GateCounter is correct
+                if startTdcGateCounter != (cyclecounter % 1024):
+                    print "ERROR: Gate counters out of sync."
+                    print "ERROR: Possible event missing in MIDAS banks"
+                    raise MissingEvent(cyclecounter)
                 self.bindata.append(tofbin)
                 # tofbin=self.numchannels*[0]
                 tofbin = []
