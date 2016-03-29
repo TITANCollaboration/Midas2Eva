@@ -57,21 +57,13 @@ class MidasToEva:
                 datafile = open(self.filename, 'r')
                 data = datafile.read()
                 datafile.close()
-                #startindex=data.find('<?xml')
+
                 startindex = data.find('<odb')
                 endindex = data.find('</odb>') + 6
-                #self.xmldata=data[startindex:endindex]
-                #self.dom=parseString(self.xmldata)
                 self.domag = ET.fromstring(data[startindex:endindex])
 
-                #secstartindex=data.find('<?xml',endindex)
                 secstartindex = data.rfind('<odb')
                 secendindex = data.rfind('</odb>') + 6
-                #print secstartindex
-                #print len(data)
-                #self.xmldata2=data[secstartindex:-1]
-                #self.dom2=parseString(self.xmldata2)
-                #self.dom2ag = ET.fromstring(data[secstartindex:-1])
                 self.dom2ag = ET.fromstring(data[secstartindex:secendindex])
             except IOError:
                 print("Could not open " + self.filename)
@@ -97,6 +89,14 @@ class MidasToEva:
             raise Exception("readmidas: Error accessing odb element: " +
                             dirpath + " " + dirname + " " + keyname)
 
+    def getOdbVariable(self, xml, dirpath, dirname, keyname, castfunc,
+                       var, varcastfunc):
+        if var is not None:
+            var = varcastfunc(var)
+        else:
+            var = self.getAttribute(xml, dirpath, dirname, keyname, castfunc)
+        return var
+
     def getBaseFreq(self):
         if self.status == 1 and len(self.xmldata) > 0:
             elementlist = self.dom.getElementsByTagName('key')
@@ -110,116 +110,79 @@ class MidasToEva:
                 print 'Could not determine base frequency.'
 
     def getAmplitude(self, rfamp=None):
-        if rfamp is not None:
-            self.amplitude = float(rfamp)
-        else:
-            self.amplitude = self.getAttribute(self.domag, './dir/dir',
-                                               'Variables', 'MPETRFAmp', float)
-
-        if self.amplitude == -1:
-            print 'Could not determine amplitude.'
-        else:
-            print 'RF amplitude = ' + str(self.amplitude) + ' Volts'
+        self.amplitude = self.getOdbVariable(self.domag, './dir/dir',
+                                             'Variables', 'MPETRFAmp', float,
+                                             rfamp, float)
+        print 'RF amplitude = ' + str(self.amplitude) + ' Volts'
 
     def getStartFreq(self, startf=None):
-        # AG: 16.04.12
         # Need to use the second odb dump in the mid file
-        if startf is not None:
-            # hack. Commandline input is in Hz, odb is in MHz
-            self.startfreq = float(startf) / 1e6
-        else:
-            self.startfreq = self.getAttribute(self.dom2ag, './dir/dir',
-                                               'Variables', 'StartFreq (MHz)',
-                                               float)
-
+        # Commandline is in Hz, convert to MHz in varcastfunc
+        self.startfreq = self.getOdbVariable(self.dom2ag, './dir/dir',
+                                             'Variables', 'StartFreq (MHz)',
+                                             float, startf,
+                                             lambda x: float(x) / 1e6)
         self.startfreq *= 1e6
         print 'Start frequency = ' + str(self.startfreq) + ' Hertz'
 
     def getStopFreq(self, stopf=None):
-        if stopf is not None:
-            # hack. Commandline input is in Hz, odb is in MHz
-            self.stopfreq = float(stopf) / 1e6
-        else:
-            self.stopfreq = self.getAttribute(self.dom2ag, './dir/dir',
-                                              'Variables', 'EndFreq (MHz)',
-                                              float)
-
+        # Need to use the second odb dump in the mid file
+        # Commandline is in Hz, convert to MHz in varcastfunc
+        self.stopfreq = self.getOdbVariable(self.dom2ag, './dir/dir',
+                                            'Variables', 'EndFreq (MHz)',
+                                            float, stopf,
+                                            lambda x: float(x) / 1e6)
         self.stopfreq *= 1e6
-        if self.stopfreq == -1:
-            # ATG 22-10-2015:
-            # The code should never get here.
-            # Is this from when I rewrote Ryan's code?
-            print 'Could not determine stop frequency.'
-        else:
-            print 'Stop frequency = ' + str(self.stopfreq) + ' Hertz'
+        print 'Stop frequency = ' + str(self.stopfreq) + ' Hertz'
 
     def getNumFreqSteps(self, nfreq=None):
-        if nfreq is not None:
-            self.numfreqsteps = float(nfreq)
-        else:
-            self.numfreqsteps = self.getAttribute(self.dom2ag,
-                                                  './dir/dir/dir/dir',
-                                                  'begin_ramp',
-                                                  'loop count',
-                                                  float)
+        self.numfreqsteps = self.getOdbVariable(self.dom2ag,
+                                                './dir/dir/dir/dir',
+                                                'begin_ramp',
+                                                'loop count',
+                                                float,
+                                                nfreq,
+                                                float)
+        print 'Number of frequency steps = ' + str(self.numfreqsteps)
 
-        if self.numfreqsteps == -1:
-            print 'Could not determine the number of frequency steps'
-        else:
-            print 'Number of frequency steps = ' + str(self.numfreqsteps)
-
-        print self.numfreqsteps
-
-    def getNumCycles(self):
-        self.numcycles = self.getAttribute(self.domag, './dir/dir/dir/dir',
-                                           'begin_scan', 'loop count', float)
-        if self.numcycles == -1:
-            print 'Could not determine the number of cycles'
+    def getNumCycles(self, numcycles=None):
+        self.numcycles = self.getOdbVariable(self.dom2ag,
+                                             './dir/dir/dir/dir',
+                                             'begin_scan',
+                                             'loop count',
+                                             float,
+                                             numcycles,
+                                             float)
 
     def getCycleTime(self):
         pass
 
     def getStartTime(self, startt=None):
-        self.starttime = self.getAttribute(self.domag, './dir', 'Runinfo',
-                                           'Start time binary', float)
-        if self.starttime == -1:
-            print 'Could not determine the start time'
-        else:
-            print 'Start time = ' + str(self.starttime)
+        self.starttime = self.getOdbVariable(self.domag, './dir', 'Runinfo',
+                                             'Start time binary', float,
+                                             startt, float)
+        print 'Start time = ' + str(self.starttime)
 
     def getEndTime(self, stopt=None):
-        self.endtime = self.getAttribute(self.dom2ag, './dir', 'Runinfo',
-                                         'Stop time binary', float)
-        if self.endtime == -1:
-            print 'Could not determine the end time'
-        else:
-            print 'End time =' + str(self.endtime)
+        self.endtime = self.getOdbVariable(self.dom2ag, './dir', 'Runinfo',
+                                           'Stop time binary', float,
+                                           stopt, float)
+        print 'End time = ' + str(self.endtime)
 
     def getElem(self, mass=None):
-        if mass is not None:
-            self.mass = str(mass)
-        else:
-            self.mass = self.getAttribute(self.domag, './dir/dir', 'Variables',
-                                          'Species', str)
-
-        if self.mass == -1:
-            print 'Could not determine element'
-        else:
-            print 'Element = ' + self.mass
+        self.mass = self.getOdbVariable(self.domag, './dir/dir', 'Variables',
+                                        'Species', str, mass, str)
+        print 'Element = ' + self.mass
 
     def getZ(self, Z=None):
-        if Z is not None:
-            self.charge = int(Z)
-        else:
-            self.charge = self.getAttribute(self.domag, './dir/dir',
-                                            'Variables', 'Charge')
-            self.charge = [int(x) for x in self.charge.split(';')]
-            self.charge = self.charge[0]
+        self.charge = self.getOdbVariable(self.domag, './dir/dir',
+                                          'Variables', 'Charge', str,
+                                          Z, str)
 
-        if self.charge == -1:
-            print 'Could not determine charge'
-        else:
-            print 'Charge = ' + str(self.charge)
+        self.charge = [int(x) for x in self.charge.split(';')]
+        self.charge = self.charge[0]
+
+        print 'Charge = ' + str(self.charge)
 
     def getRFTime(self, trf=None):
         '''if no trf value is passed, search the midas file for it.
@@ -228,8 +191,7 @@ class MidasToEva:
            Passed trf is in seconds.'''
 
         if trf is not None:
-            # hack, since original code expects the value in
-            # seconds from the commandline.
+            # Commandline input is in ms, convert to s
             self.trf = float(trf) * 1000.0
         else:
             transNum = 2
@@ -253,30 +215,14 @@ class MidasToEva:
         # Convert from ms to sec
         self.trf /= 1000.
 
-        if self.trf == -1:
-            # ATG 22-10-2015:
-            # The code should never get here.
-            # Is this from when I rewrote Ryan's code?
-            print 'Could not determine the RF time'
-        else:
-            print 'RF Time = ' + str(self.trf) + ' s'
+        print 'RF Time = ' + str(self.trf) + ' s'
 
     def setTdcGateWidth(self, tdcTime=None):
-        if tdcTime is not None:
-            self.tdcTime = float(tdcTime)
-        else:
-            self.tdcTime = self.getAttribute(self.domag, "./dir/dir/dir/dir",
-                                             "pul_TDCGate", "pulse width (ms)",
-                                             float)
-            self.tdcTime *= 1000.0
-
-        if self.tdcTime == -1:
-            # ATG 22-10-2015:
-            # The code should never get here.
-            # Is this from when I rewrote Ryan's code?
-            print 'Could not determine amplitude'
-        else:
-            print 'TDC Gate Width = ' + str(self.tdcTime) + ' us'
+        self.tdcTime = self.getOdbVariable(self.domag, "./dir/dir/dir/dir",
+                                           "pul_TDCGate", "pulse width (ms)",
+                                           lambda x: float(x) * 1000.0,
+                                           tdcTime, float)
+        print 'TDC Gate Width = ' + str(self.tdcTime) + ' us'
 
     def collectMdumpData(self):
         '''
@@ -541,18 +487,10 @@ class MidasToEva:
         except IOError:
             print 'Could not open ' + path + ' for writing.'
             return
-        # AG 11.07.12 - m2e changes to output TOF in position file
-        #TTOF=[]
-        #for i in range(len(self.bindata)):
-        #	for j in range(len(self.bindata[i])):
-        #		if self.bindata[i][j]!=0:
-        #			TTOF.append(self.bindata[i][j])
 
         for num in self.posdata:
             x = int(num[6:8], 16)
             y = int(num[8:10], 16)
-            #datafile.write(str(len(self.posdata))+' '+str(len(TTOF))+
-            #               ' '+str(x)+' '+str(y)+'\n')
             datafile.write(str(x) + ' ' + str(y) + '\n')
 
         datafile.close()
