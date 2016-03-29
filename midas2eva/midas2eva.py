@@ -289,53 +289,29 @@ class MidasToEva:
         comstring = 'mdump -b MPET -x ' + self.filename
         status, data = commands.getstatusoutput(comstring)
 
-        startindex = 0
-        #datalength = len(data)
-        mdumpdata = []
-        self.posdata = []
+        self.mdumpdata = self.extractBankData('Bank:MPET', data)
 
-        #if data.find('Bank:MPET')==-1:
-        if 'Bank:MPET' in data:
-            for match in re.finditer('Bank:MPET', data):
+        self.posdata = self.extractBankData('Bank:MCPP', data)
+
+    def extractBankData(self, BankName, data):
+        mdumpdata = []
+
+        if BankName in data:
+            for match in re.finditer(BankName, data):
                 leftindex = match.end()
                 tempindex = data.find('Length: ', leftindex)
                 tempstring = data[tempindex + 8: tempindex + 18]
                 temp = tempstring.split('(')
                 numentries = int(temp[0]) / 4
 
-                counter = 1
-                #while counter<=numentries:
                 for counter in xrange(numentries):
                     midindex = data.find('0x', leftindex)
                     mdumpdata.append(data[midindex:midindex + 10])
-                    #counter+=1
                     leftindex = midindex + 1
-
-                #startindex=leftindex
         else:
-            print 'No valid MPET banks found in file.'
-        self.mdumpdata = mdumpdata
+            print 'No valid ' + BankName + ' banks found in file.'
 
-        #if data.find('Bank:MCPP')==-1:
-        if 'Bank:MCPP' in data:
-            startindex = 0
-            while data.find('Bank:MCPP', startindex) != -1:
-                leftindex = data.find('Bank:MCPP', startindex)
-                tempindex = data.find('Length: ', leftindex)
-                tempstring = data[tempindex + 8: tempindex + 18]
-                temp = tempstring.split('(')
-                numentries = int(temp[0]) / 4
-
-                counter = 1
-                while counter <= numentries:
-                    midindex = data.find('0x', leftindex)
-                    self.posdata.append(data[midindex: midindex + 10])
-                    counter += 1
-                    leftindex = midindex + 1
-
-                startindex = leftindex
-        else:
-            print 'No valid MCPP banks found in file.'
+        return mdumpdata
 
     def reorganizeMdumpData(self):
         '''
@@ -411,28 +387,22 @@ class MidasToEva:
                 continue
             elif entry[0] == 1:
                 endTdcGateCounter = entry[1]
-                # Check that the start and end GateCounters
-                # are correct
-                if startTdcGateCounter != endTdcGateCounter:
-                    print "ERROR: Gate counters out of sync."
-                    if startTdcGateCounter < endTdcGateCounter:
-                        print "ERROR: missing TDCGateOpen event"
-                        raise MissingTDCOpen(cyclecounter)
-                    else:
-                        print "ERROR: missing TDCGateClose event"
-                        raise MissingTDCClose(cyclecounter)
+                # Check that the start and end GateCounters are correct
+                self.checkStartEndGateCounters(startTdcGateCounter,
+                                               endTdcGateCounter,
+                                               cyclecounter)
 
                 #print endTdcGateCounter, (startTdcGateCounter % 1024)
                 # Increment cycle counter
                 cyclecounter = cyclecounter + 1
-                # Cycle counter resets at 1024, so we check that the
-                # mod of the GateCounter is correct
-                if startTdcGateCounter != (cyclecounter % 1024):
-                    print "ERROR: Gate counters out of sync."
-                    print "ERROR: Possible event missing in MIDAS banks"
-                    raise MissingEvent(cyclecounter)
+
+                # Check that cycle counter is updating correctly
+                self.checkCycleCounter(startTdcGateCounter, cyclecounter)
+
+                # Append tof bin data
                 self.bindata.append(tofbin)
-                # tofbin=self.numchannels*[0]
+
+                # reset tof bin
                 tofbin = []
                 continue
             elif entry[0] == 4:
@@ -442,6 +412,32 @@ class MidasToEva:
                     bin = int(floor(entry[2] / binwidth))
                     #tofbin[bin]=tofbin[bin]+1
                     tofbin.append(bin)
+
+    def checkStartEndGateCounters(self, startTdcGateCounter,
+                                  endTdcGateCounter, cyclecounter):
+        '''Check if the start and end TDC gate counters are the same.
+           If not, raise an exception with the cycle counter that
+           gave the error.'''
+        if startTdcGateCounter != endTdcGateCounter:
+            print "ERROR: Gate counters out of sync."
+            if startTdcGateCounter < endTdcGateCounter:
+                print "ERROR: missing TDCGateOpen event"
+                raise MissingTDCOpen(cyclecounter)
+            else:
+                print "ERROR: missing TDCGateClose event"
+                raise MissingTDCClose(cyclecounter)
+
+    def checkCycleCounter(self, startTdcGateCounter, cyclecounter):
+        '''Check if the current cycle counter is correct.
+        This will only catch cases where an extraction
+        cycle is missed by the DAQ (i.e. counter 2 -> 4,
+        where event 3 is missing from the data stream).'''
+        # Cycle counter resets at 1024, so we check that the
+        # mod of the GateCounter is correct
+        if startTdcGateCounter != (cyclecounter % 1024):
+            print "ERROR: Gate counters out of sync."
+            print "ERROR: Possible event missing in MIDAS banks"
+            raise MissingEvent(cyclecounter)
 
     def writeEvaFile(self, mass, charge, amp, extime,
                      path='/triumfcs/trshare/titan/MPET/Data/'):
